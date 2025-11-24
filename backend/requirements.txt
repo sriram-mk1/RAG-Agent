@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+langchain
+langchain-google-genai
+langchain-community
+pinecone-client
+supabase
+python-dotenv
+pydantic
+langchain-pinecone
+pypdf
+python-docx
+unstructured

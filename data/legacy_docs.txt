@@ -1,0 +1,25 @@
+SYSTEM: LEGACY_PAYMENT_PROCESSOR_V1
+AUTHOR: J. DOE
+DATE: 1998-05-12
+
+OVERVIEW:
+The Legacy Payment Processor V1 (LPP-V1) is a COBOL-based batch processing system designed to handle credit card transactions for the retail sector. It runs on the Mainframe Z9000.
+
+MODULES:
+1. MOD_INIT_01: Initializes the daily batch. It reads from the TAPE_DRIVE_A.
+   - ERROR_CODE_99: Tape not mounted.
+2. MOD_PROC_02: Processes transactions.
+   - LOGIC: If TRANS_AMT > 10000, flag for MANUAL_REVIEW.
+   - DEPENDENCY: Requires TABLE_RATES_98 to be loaded in memory.
+3. MOD_FIN_03: Finalizes the batch and prints the report to PRINTER_LP01.
+
+CONFIGURATION:
+- Config file is located at /etc/lpp/config.dat (binary format).
+- To update rates, run the separate utility UPDATE_RATES.EXE.
+
+KNOWN ISSUES:
+- The system crashes if the transaction date is Feb 29th on a non-leap year (bug in date validation routine DATE_CHECK_SUB).
+- Do not restart MOD_PROC_02 without clearing the TEMP_CACHE table, otherwise double billing occurs.
+
+CONTACT:
+For support, page the on-call mainframe operator at extension 5555.
