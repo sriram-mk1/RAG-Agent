@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.chains import create_history_aware_retriever, create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage, AIMessage
 from pinecone import Pinecone
 from supabase import create_client, Client
@@ -32,7 +32,7 @@ try:
     index_name = os.getenv("PINECONE_INDEX_NAME", "legacy-rag-index")
     index = pc.Index(index_name)
     
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-005")
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
     vectorstore = PineconeVectorStore(index=index, embedding=embeddings)
     
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
@@ -53,45 +53,48 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
 
-def get_retrieval_chain():
-    # 1. Contextualize question
-    contextualize_q_system_prompt = """Given a chat history and the latest user question \
-    which might reference context in the chat history, formulate a standalone question \
-    which can be understood without the chat history. Do NOT answer the question, \
-    just reformulate it if needed and otherwise return it as is."""
+def get_rag_response(question: str, chat_history: List):
+    """Simple RAG implementation with enhanced formatting"""
+    # Get relevant documents
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+    docs = retriever.invoke(question)
     
-    contextualize_q_prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", contextualize_q_system_prompt),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-        ]
-    )
+    # Format context
+    context = "\n\n".join([doc.page_content for doc in docs])
     
-    history_aware_retriever = create_history_aware_retriever(
-        llm, vectorstore.as_retriever(), contextualize_q_prompt
-    )
+    # Create enhanced prompt for better responses
+    system_prompt = f"""You are a helpful and friendly expert assistant for legacy systems documentation.
+
+Use the following context to answer the user's question:
+
+{context}
+
+Guidelines:
+- Be conversational and helpful, like a senior engineer explaining to a colleague.
+- Answer ONLY based on the provided context. If you don't know, just say so politely.
+- Keep it concise and easy to read. Use markdown (bullets, `code`) where helpful.
+- Avoid unnecessary fluff, but don't be robotic.
+
+Format your response to be easily scannable."""
     
-    # 2. Answer question
-    qa_system_prompt = """You are an expert assistant for a legacy system called 'Legacy Payment Processor V1'. \
-    Use the following pieces of retrieved context to answer the question. \
-    If you don't know the answer, say that you don't know. \
-    Use three sentences maximum and keep the answer concise. \
+    messages = [("system", system_prompt)]
     
-    {context}"""
+    # Add chat history
+    for msg in chat_history:
+        if isinstance(msg, HumanMessage):
+            messages.append(("human", msg.content))
+        elif isinstance(msg, AIMessage):
+            messages.append(("assistant", msg.content))
     
-    qa_prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", qa_system_prompt),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-        ]
-    )
+    # Add current question
+    messages.append(("human", question))
     
-    question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+    # Get response
+    prompt = ChatPromptTemplate.from_messages(messages)
+    chain = prompt | llm | StrOutputParser()
+    response = chain.invoke({})
     
-    rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
-    return rag_chain
+    return response
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
@@ -104,31 +107,36 @@ async def chat_endpoint(request: ChatRequest):
             elif msg['role'] == 'assistant':
                 chat_history.append(AIMessage(content=msg['content']))
         
-        chain = get_retrieval_chain()
+        answer = get_rag_response(request.message, chat_history)
         
-        response = chain.invoke({"input": request.message, "chat_history": chat_history})
-        answer = response["answer"]
-        
-        # Save to Supabase (Async in real app, sync here for simplicity)
-        # Save User Message
-        supabase.table("chat_history").insert({
-            "user_id": request.user_id,
-            "session_id": request.session_id,
-            "role": "user",
-            "content": request.message
-        }).execute()
-        
-        # Save Assistant Message
-        supabase.table("chat_history").insert({
-            "user_id": request.user_id,
-            "session_id": request.session_id,
-            "role": "assistant",
-            "content": answer
-        }).execute()
+        # Save to Supabase (only if user is authenticated)
+        try:
+            if request.user_id and request.user_id != 'test':
+                # Save User Message
+                supabase.table("chat_history").insert({
+                    "user_id": request.user_id,
+                    "session_id": request.session_id,
+                    "role": "user",
+                    "content": request.message
+                }).execute()
+                
+                # Save Assistant Message
+                supabase.table("chat_history").insert({
+                    "user_id": request.user_id,
+                    "session_id": request.session_id,
+                    "role": "assistant",
+                    "content": answer
+                }).execute()
+        except Exception as db_error:
+            # Log but don't fail the request if DB save fails
+            print(f"Warning: Failed to save to database: {db_error}")
         
         return ChatResponse(response=answer)
         
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")

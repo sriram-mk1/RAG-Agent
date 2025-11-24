@@ -27,7 +27,7 @@ def setup_vector_db():
         try:
             pc.create_index(
                 name=index_name,
-                dimension=768, # Google embedding-001 dimension
+                dimension=768, # text-embedding-004 dimension
                 metric="cosine",
                 spec=ServerlessSpec(cloud="aws", region="us-east-1") # Defaulting to us-east-1 if not specified, or use env
             )
@@ -80,7 +80,7 @@ def setup_vector_db():
     docs = text_splitter.split_documents(documents)
     
     print(f"Embedding {len(docs)} chunks...")
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-005")
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
     
     # Upsert to Pinecone
     try:

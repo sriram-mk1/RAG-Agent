@@ -4,12 +4,16 @@ AI-powered assistant for legacy code documentation using RAG (Retrieval-Augmente
 
 ## Features
 
-- **React Frontend** with Shadcn/ui components
+- **Modern UI** with sidebar navigation and chat history
+- **Multiple Chat Sessions** - Create and manage different conversations
+- **Markdown Support** - Responses formatted with headings, lists, code blocks
+- **React Frontend** with Shadcn/ui components and Tailwind CSS
 - **Python Backend** with FastAPI and LangChain
-- **Vector Database** using Pinecone
+- **Vector Database** using Pinecone (768-dim embeddings)
 - **LLM** powered by Google's Gemini 2.5 Flash
-- **Embeddings** using Google's text-embedding-005
+- **Embeddings** using Google's text-embedding-004
 - **Authentication & Chat History** via Supabase
+- **Multi-format Document Support** - PDF, DOCX, MD, TXT
 
 ## Setup
 

@@ -1,0 +1,13 @@
+{
+    "name": "rag-agent",
+    "version": "1.0.0",
+    "description": "RAG Agent for Legacy Documentation",
+    "scripts": {
+        "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+        "dev:frontend": "cd frontend && npm run dev",
+        "dev:backend": "source .venv/bin/activate && uvicorn backend.main:app --reload"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}

@@ -16,3 +16,7 @@ frontend/.vite
 
 # Miscellaneous
 .DS_Store
+
+# Virtual environment
+.venv/
+venv/
