@@ -1,0 +1,18 @@
+# Ignore environment files
+.env
+.env.example
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Node modules (root and frontend)
+node_modules/
+frontend/node_modules/
+
+# Vite build output
+frontend/dist/
+frontend/.vite
+
+# Miscellaneous
+.DS_Store
